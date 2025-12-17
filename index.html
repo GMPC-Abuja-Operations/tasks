@@ -5,52 +5,72 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Team Task System</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background: #f9f9f9; }
+    body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; padding: 20px; background: #f9f9f9; }
     h1 { text-align: center; color: #333; }
     label { display: block; margin: 15px 0 5px; font-weight: bold; }
-    input, select { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+    input, select, textarea { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
     button { background: #007bff; color: white; padding: 12px; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; margin-top: 20px; }
     button:hover { background: #0056b3; }
     #response { margin-top: 20px; padding: 15px; border-radius: 4px; display: none; }
     .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
     .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
     .hidden { display: none; }
+    .mode-section { border: 1px solid #ddd; padding: 20px; border-radius: 8px; background: white; margin-bottom: 20px; }
+    input[type="radio"] { width: auto; margin-right: 10px; }
   </style>
 </head>
 <body>
-  <h1>New Task Submission</h1>
+  <h1>Team Task System</h1>
+
+  <div class="mode-section">
+    <label><input type="radio" name="mode" value="newTask" checked> New Task</label>
+    <label><input type="radio" name="mode" value="completeTask"> Complete / Resubmit Task</label>
+  </div>
+
   <form id="taskForm">
-    <label>Task Title *</label>
-    <input type="text" id="title" required>
+    <!-- New Task Fields -->
+    <div id="newTaskFields">
+      <label>Task Title *</label>
+      <input type="text" id="title" required>
 
-    <label>Task Type *</label>
-    <select id="taskType" required onchange="toggleClientField()">
-      <option value="">Select type</option>
-      <option value="Client">Client Task</option>
-      <option value="Internal">Internal / Category Task</option>
-      <option value="NoDeliverable">No Deliverable Task</option>
-    </select>
+      <label>Task Type *</label>
+      <select id="taskType" required>
+        <option value="">Select type</option>
+        <option value="Client">Client Task</option>
+        <option value="Internal">Internal / Category Task</option>
+        <option value="NoDeliverable">No Deliverable Task</option>
+      </select>
 
-    <div id="clientDiv" class="hidden">
-      <label>Client Name *</label>
-      <input type="text" id="clientName">
+      <div id="clientDiv" class="hidden">
+        <label>Client Name *</label>
+        <input type="text" id="clientName">
+      </div>
+
+      <div id="categoryDiv" class="hidden">
+        <label>Category Name (optional)</label>
+        <input type="text" id="categoryName">
+      </div>
+
+      <label>Owner Name *</label>
+      <input type="text" id="owner" required>
+
+      <label>Owner Email (for confirmation)</label>
+      <input type="email" id="ownerEmail">
+
+      <label>Due Date (optional)</label>
+      <input type="date" id="dueDate">
     </div>
 
-    <div id="categoryDiv" class="hidden">
-      <label>Category Name (optional)</label>
-      <input type="text" id="categoryName">
+    <!-- Complete Task Fields -->
+    <div id="completeTaskFields" class="hidden">
+      <label>Task ID * (e.g. 20251217-03)</label>
+      <input type="text" id="taskId" placeholder="Enter existing Task ID" required>
+
+      <label>Notes / Comments for approver</label>
+      <textarea id="comments" rows="4"></textarea>
     </div>
 
-    <label>Owner Name *</label>
-    <input type="text" id="owner" required>
-
-    <label>Owner Email (for confirmation)</label>
-    <input type="email" id="ownerEmail">
-
-    <label>Due Date (optional)</label>
-    <input type="date" id="dueDate">
-
-    <button type="submit">Create Task</button>
+    <button type="submit" id="submitBtn">Create Task</button>
   </form>
 
   <div id="response"></div>
@@ -58,29 +78,47 @@
   <script>
     const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwhzb8rjVSppT2sTTj_Bm_SRjtSFlI5RsUvxLV2SHZ-bE48sh30ImvF65irzRRc_z4n/exec';
 
-    function toggleClientField() {
-      const type = document.getElementById('taskType').value;
-      document.getElementById('clientDiv').classList.toggle('hidden', type !== 'Client');
-      document.getElementById('categoryDiv').classList.toggle('hidden', type !== 'Internal');
-      document.getElementById('clientName').required = type === 'Client';
+    function toggleMode() {
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      document.getElementById('newTaskFields').classList.toggle('hidden', mode !== 'newTask');
+      document.getElementById('completeTaskFields').classList.toggle('hidden', mode !== 'completeTask');
+      document.getElementById('submitBtn').textContent = mode === 'newTask' ? 'Create Task' : 'Submit for Approval';
+      toggleClientField();
     }
+
+    function toggleClientField() {
+      const type = document.getElementById('taskType')?.value;
+      if (type) {
+        document.getElementById('clientDiv').classList.toggle('hidden', type !== 'Client');
+        document.getElementById('categoryDiv').classList.toggle('hidden', type !== 'Internal');
+      }
+    }
+
+    document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', toggleMode));
+    toggleMode(); // Initial
+
+    document.getElementById('taskType')?.addEventListener('change', toggleClientField);
 
     document.getElementById('taskForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const responseDiv = document.getElementById('response');
       responseDiv.style.display = 'none';
-      responseDiv.className = '';
 
-      const data = {
-        mode: 'newTask',
-        title: document.getElementById('title').value.trim(),
-        owner: document.getElementById('owner').value.trim(),
-        ownerEmail: document.getElementById('ownerEmail').value.trim(),
-        dueDate: document.getElementById('dueDate').value,
-        taskType: document.getElementById('taskType').value,
-        clientName: document.getElementById('clientName').value.trim() || undefined,
-        clientOrCategory: document.getElementById('categoryName').value.trim() || undefined
-      };
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      let data = { mode };
+
+      if (mode === 'newTask') {
+        data.title = document.getElementById('title').value.trim();
+        data.owner = document.getElementById('owner').value.trim();
+        data.ownerEmail = document.getElementById('ownerEmail').value.trim();
+        data.dueDate = document.getElementById('dueDate').value;
+        data.taskType = document.getElementById('taskType').value;
+        data.clientName = document.getElementById('clientName').value.trim() || undefined;
+        data.clientOrCategory = document.getElementById('categoryName').value.trim() || undefined;
+      } else {
+        data.taskId = document.getElementById('taskId').value.trim();
+        data.comments = document.getElementById('comments').value.trim();
+      }
 
       try {
         await fetch(WEB_APP_URL, {
@@ -92,17 +130,14 @@
 
         responseDiv.style.display = 'block';
         responseDiv.className = 'success';
-        responseDiv.innerHTML = `<strong>Success!</strong><br>
-          Task created successfully!<br>
-          Check your Trello board and spreadsheet for the new task.<br><br>
-          (Task ID appears in the Trello card title)`;
+        responseDiv.innerHTML = `<strong>Success!</strong><br>${mode === 'newTask' ? 'New task created!' : 'Task submitted for approval!'}<br>Check Trello board.`;
         document.getElementById('taskForm').reset();
-        toggleClientField();
+        toggleMode();
 
       } catch (err) {
         responseDiv.style.display = 'block';
         responseDiv.className = 'error';
-        responseDiv.textContent = 'Network error: ' + err.message;
+        responseDiv.textContent = 'Error: ' + err.message;
       }
     });
   </script>
